@@ -28,7 +28,11 @@ const DOT_SPEED = 4; // ドットの移動速度
 const DOT_LIFETIME = 120; // フレーム数（2秒程度）
 
 export default function Home() {
-  const [windowSize, setWindowSize] = useState<{ width: number; height: number } | null>(null);
+  // 初期値を仮のサイズに
+  const [windowSize, setWindowSize] = useState<{ width: number; height: number }>({
+    width: 800,
+    height: 600,
+  });
   const [ripples, setRipples] = useState<Ripple[]>([]);
   const [dots, setDots] = useState<Dot[]>([]);
   const [isVisible, setIsVisible] = useState(false);
@@ -39,7 +43,7 @@ export default function Home() {
   const [lines, setLines] = useState<MovingLine[]>([]);
   const lineId = useRef(0);
 
-  // ウィンドウサイズ取得
+  // クライアントマウント時に本当のサイズで上書き
   useEffect(() => {
     const updateSize = () => {
       setWindowSize({
@@ -52,14 +56,13 @@ export default function Home() {
     return () => window.removeEventListener('resize', updateSize);
   }, []);
 
-  if (!windowSize) return null;
-
   // 0〜1のprogressを、easeOutQuadで変換
   const easeOutQuad = (t: number) => 1 - (1 - t) * (1 - t);
   const easeInOutQuad = (t: number) => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 
   // 表示/非表示の切り替え
   useEffect(() => {
+    if (!windowSize) return;
     let timeoutId: NodeJS.Timeout;
     let fadeAnimationFrameId: number;
     let startTime: number;
@@ -120,10 +123,11 @@ export default function Home() {
       clearTimeout(timeoutId);
       cancelAnimationFrame(fadeAnimationFrameId);
     };
-  }, [isVisible]);
+  }, [isVisible, windowSize]);
 
   // 波紋を画面内のランダムな位置に発生（間隔もランダム）
   useEffect(() => {
+    if (!windowSize) return;
     let timeoutId: NodeJS.Timeout;
 
     const spawnRipple = () => {
@@ -144,6 +148,7 @@ export default function Home() {
 
   // 波紋のアニメーション＋交差判定
   useEffect(() => {
+    if (!windowSize) return;
     let raf: number;
     crossedPairs.current = new Set();
 
@@ -235,6 +240,7 @@ export default function Home() {
 
   // 直線を一定間隔で追加
   useEffect(() => {
+    if (!windowSize) return;
     let timeoutId: NodeJS.Timeout;
     const spawnLine = () => {
       // x座標は画面内のランダムな位置
@@ -255,6 +261,7 @@ export default function Home() {
 
   // 直線のアニメーション
   useEffect(() => {
+    if (!windowSize) return;
     let raf: number;
     const animate = () => {
       setLines(prev =>
