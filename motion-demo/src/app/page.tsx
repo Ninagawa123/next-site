@@ -308,6 +308,10 @@ export default function Home() {
     return () => cancelAnimationFrame(raf);
   }, [ripples, maxRadius]);
 
+  useEffect(() => {
+    setRipples([]);
+  }, [svgSize.width, svgSize.height]);
+
   return (
     <main
       style={{
