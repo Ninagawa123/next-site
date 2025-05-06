@@ -2,6 +2,6 @@
 
 export default function handler(req, res) {
   res.status(200).json({
-    message: "にゃんとる, もしくはぺぎもくる"
+    message: "にゃんとる, もしくはぺぎもくる, もちのく"
   });
 }
