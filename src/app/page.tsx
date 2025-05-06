@@ -2,80 +2,61 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 
-const BALL_SIZE = 40;
-const BALL_COLOR = '#FF3333';
-const BG_COLOR = '#000000';
-const INIT_VX = 4; // x方向の初期速度
-const INIT_VY = 3; // y方向の初期速度
+const BG_COLOR = '#222831';
+const RIPPLE_COLOR = '#6EC1E4';
+const RIPPLE_MAX_RADIUS = 120;
+const RIPPLE_DURATION = 1800; // ms
+
+type Ripple = {
+    id: number;
+    cx: number;
+    cy: number;
+    start: number;
+};
 
 export default function Home() {
-    // ウィンドウサイズ
-    const [windowSize, setWindowSize] = useState({ width: 1920, height: 1080 });
-    // ボールの状態
-    const [ball, setBall] = useState({
-        x: 960,
-        y: 540,
-        vx: INIT_VX,
-        vy: INIT_VY,
-    });
+    const [windowSize, setWindowSize] = useState({ width: 800, height: 600 });
+    const [ripples, setRipples] = useState<Ripple[]>([]);
+    const rippleId = useRef(0);
 
-    // ウィンドウリサイズ監視
+    // ウィンドウサイズ取得
     useEffect(() => {
-        const handleResize = () => {
+        const updateSize = () => {
             setWindowSize({
                 width: window.innerWidth,
                 height: window.innerHeight,
             });
         };
-        handleResize();
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
+        updateSize();
+        window.addEventListener('resize', updateSize);
+        return () => window.removeEventListener('resize', updateSize);
     }, []);
 
-    // ウィンドウサイズが変わったらボールが壁の外に出ないように補正
+    // 波紋を画面内のランダムな位置に2倍の頻度で発生
     useEffect(() => {
-        setBall(prev => ({
-            ...prev,
-            x: Math.min(Math.max(prev.x, 0), windowSize.width - BALL_SIZE),
-            y: Math.min(Math.max(prev.y, 0), windowSize.height - BALL_SIZE),
-        }));
+        const interval = setInterval(() => {
+            const cx = Math.random() * windowSize.width;
+            const cy = Math.random() * windowSize.height;
+            setRipples(prev => [
+                ...prev,
+                { id: rippleId.current++, cx, cy, start: Date.now() },
+            ]);
+        }, 300); // 2倍の頻度
+        return () => clearInterval(interval);
     }, [windowSize]);
 
-    // アニメーション
+    // 波紋のアニメーション
     useEffect(() => {
-        let animationId: number;
-
+        let raf: number;
         const animate = () => {
-            setBall(prev => {
-                let { x, y, vx, vy } = prev;
-
-                x += vx;
-                y += vy;
-
-                // 壁で跳ね返る
-                if (x <= 0) {
-                    x = 0;
-                    vx = Math.abs(vx);
-                } else if (x + BALL_SIZE >= windowSize.width) {
-                    x = windowSize.width - BALL_SIZE;
-                    vx = -Math.abs(vx);
-                }
-                if (y <= 0) {
-                    y = 0;
-                    vy = Math.abs(vy);
-                } else if (y + BALL_SIZE >= windowSize.height) {
-                    y = windowSize.height - BALL_SIZE;
-                    vy = -Math.abs(vy);
-                }
-
-                return { x, y, vx, vy };
-            });
-            animationId = requestAnimationFrame(animate);
+            setRipples(prev =>
+                prev.filter(r => Date.now() - r.start < RIPPLE_DURATION)
+            );
+            raf = requestAnimationFrame(animate);
         };
-
-        animationId = requestAnimationFrame(animate);
-        return () => cancelAnimationFrame(animationId);
-    }, [windowSize]);
+        raf = requestAnimationFrame(animate);
+        return () => cancelAnimationFrame(raf);
+    }, []);
 
     return (
         <main
@@ -84,23 +65,34 @@ export default function Home() {
                 height: '100vh',
                 background: BG_COLOR,
                 overflow: 'hidden',
-                position: 'fixed',
-                top: 0,
-                left: 0,
             }}
         >
-            <div
-                style={{
-                    position: 'absolute',
-                    left: ball.x,
-                    top: ball.y,
-                    width: BALL_SIZE,
-                    height: BALL_SIZE,
-                    borderRadius: '50%',
-                    background: BALL_COLOR,
-                    boxShadow: '0 0 16px 4px #ff333388',
-                }}
-            />
+            <svg
+                width={windowSize.width}
+                height={windowSize.height}
+                style={{ display: 'block' }}
+            >
+                {/* 波紋 */}
+                {ripples.map(r => {
+                    const progress = Math.min(
+                        (Date.now() - r.start) / RIPPLE_DURATION,
+                        1
+                    );
+                    const radius = 10 + progress * RIPPLE_MAX_RADIUS;
+                    return (
+                        <circle
+                            key={r.id}
+                            cx={r.cx}
+                            cy={r.cy}
+                            r={radius}
+                            fill="none"
+                            stroke={RIPPLE_COLOR}
+                            strokeWidth={2.5 - 2 * progress}
+                            opacity={0.5 * (1 - progress)}
+                        />
+                    );
+                })}
+            </svg>
         </main>
     );
 }
