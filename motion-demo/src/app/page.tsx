@@ -319,18 +319,20 @@ export default function Home() {
         Next.js - Vercel - github test
       </div>
       <svg
-        width={svgSize.width}
-        height={svgSize.height}
-        viewBox={`0 0 ${svgSize.width} ${svgSize.height}`}
+        width="100vw"
+        height="100vh"
+        viewBox="0 0 1920 1080"
         style={{
           display: 'block',
-          position: 'absolute',
-          left: '50%',
-          top: '50%',
-          transform: 'translate(-50%, -50%)',
+          position: 'fixed',
+          left: 0,
+          top: 0,
+          width: '100vw',
+          height: '100vh',
           background: 'none',
+          zIndex: 0,
         }}
-        preserveAspectRatio="xMidYMid meet"
+        preserveAspectRatio="none"
       >
         {/* 垂直移動する直線 */}
         {isVisible && lines.map(line => (
