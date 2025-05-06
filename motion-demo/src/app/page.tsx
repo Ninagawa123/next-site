@@ -28,18 +28,30 @@ const DOT_SPEED = 4; // ドットの移動速度
 const DOT_LIFETIME = 120; // フレーム数（2秒程度）
 
 export default function Home() {
-  // windowSizeをHDサイズで固定
-  const windowSize = { width: 1920, height: 1080 };
+  // svgSizeの初期値はHDサイズ
+  const [svgSize, setSvgSize] = useState({ width: 1920, height: 1080 });
   const [ripples, setRipples] = useState<Ripple[]>([]);
   const [dots, setDots] = useState<Dot[]>([]);
   const [isVisible, setIsVisible] = useState(false);
   const [fadeOpacity, setFadeOpacity] = useState(0);
   const rippleId = useRef(0);
-  const maxRadius = Math.min(windowSize.width, windowSize.height) * 0.75;
+  const maxRadius = Math.min(svgSize.width, svgSize.height) * 0.75;
   const crossedPairs = useRef<Set<string>>(new Set());
   const [lines, setLines] = useState<MovingLine[]>([]);
   const lineId = useRef(0);
-  const [svgSize, setSvgSize] = useState({ width: 1920, height: 1080 });
+
+  // クライアントマウント後のみwindow参照
+  useEffect(() => {
+    const updateSize = () => {
+      setSvgSize({
+        width: Math.min(window.innerWidth, 1920),
+        height: Math.min(window.innerHeight, 1080),
+      });
+    };
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
+  }, []);
 
   // 0〜1のprogressを、easeOutQuadで変換
   const easeOutQuad = (t: number) => 1 - (1 - t) * (1 - t);
@@ -167,8 +179,8 @@ export default function Home() {
                 const ry = dx * (h / d);
 
                 // 2つの交点
-                const centerX = windowSize.width / 2;
-                const centerY = windowSize.height / 2;
+                const centerX = svgSize.width / 2;
+                const centerY = svgSize.height / 2;
                 [ { x: xm + rx, y: ym + ry }, { x: xm - rx, y: ym - ry } ].forEach(dot => {
                   // 方向ベクトルを正規化
                   const dirX = dot.x - centerX;
@@ -207,9 +219,9 @@ export default function Home() {
             dot =>
               dot.life > 0 &&
               dot.x >= -10 &&
-              dot.x <= windowSize.width + 10 &&
+              dot.x <= svgSize.width + 10 &&
               dot.y >= -10 &&
-              dot.y <= windowSize.height + 10
+              dot.y <= svgSize.height + 10
           )
       );
 
@@ -223,9 +235,9 @@ export default function Home() {
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     const spawnLine = () => {
-      const x = Math.random() * 1920;
+      const x = Math.random() * svgSize.width;
       const direction = Math.random() < 0.5 ? 1 : -1;
-      const y = direction === 1 ? -10 : 1080 + 10;
+      const y = direction === 1 ? -10 : svgSize.height + 10;
       const speed = 1 + Math.random() * 2;
       setLines(prev => [
         ...prev,
@@ -235,7 +247,7 @@ export default function Home() {
     };
     spawnLine();
     return () => clearTimeout(timeoutId);
-  }, []);
+  }, [svgSize.width, svgSize.height]);
 
   // 直線のアニメーション
   useEffect(() => {
@@ -246,7 +258,7 @@ export default function Home() {
           .map(line => {
             const newY = line.y + line.speed * line.direction;
             // 画面を横切ったら消す
-            if (line.direction === 1 && newY > windowSize.height + 10) return null;
+            if (line.direction === 1 && newY > svgSize.height + 10) return null;
             if (line.direction === -1 && newY < -10) return null;
 
             // 波紋との衝突判定
@@ -266,8 +278,8 @@ export default function Home() {
               
               if (distance <= radius && !line.hitCircles.has(r.id)) {
                 // 初回衝突時にドットを生成
-                const centerX = windowSize.width / 2;
-                const centerY = windowSize.height / 2;
+                const centerX = svgSize.width / 2;
+                const centerY = svgSize.height / 2;
                 
                 // 方向ベクトルを正規化
                 const dirX = line.x - centerX;
@@ -296,18 +308,6 @@ export default function Home() {
     return () => cancelAnimationFrame(raf);
   }, [ripples, maxRadius]);
 
-  useEffect(() => {
-    const updateSize = () => {
-      setSvgSize({
-        width: Math.min(window.innerWidth, 1920),
-        height: Math.min(window.innerHeight, 1080),
-      });
-    };
-    updateSize();
-    window.addEventListener('resize', updateSize);
-    return () => window.removeEventListener('resize', updateSize);
-  }, []);
-
   return (
     <main
       style={{
@@ -332,9 +332,9 @@ export default function Home() {
         Next.js - Vercel - github test
       </div>
       <svg
-        width="1920"
-        height="1080"
-        viewBox="0 0 1920 1080"
+        width={svgSize.width}
+        height={svgSize.height}
+        viewBox={`0 0 ${svgSize.width} ${svgSize.height}`}
         style={{
           display: 'block',
           position: 'absolute',
