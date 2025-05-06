@@ -39,6 +39,7 @@ export default function Home() {
   const crossedPairs = useRef<Set<string>>(new Set());
   const [lines, setLines] = useState<MovingLine[]>([]);
   const lineId = useRef(0);
+  const [svgSize, setSvgSize] = useState({ width: 1920, height: 1080 });
 
   // 0〜1のprogressを、easeOutQuadで変換
   const easeOutQuad = (t: number) => 1 - (1 - t) * (1 - t);
@@ -113,8 +114,8 @@ export default function Home() {
     let timeoutId: NodeJS.Timeout;
 
     const spawnRipple = () => {
-      const cx = Math.random() * 1920;
-      const cy = Math.random() * 1080;
+      const cx = Math.random() * svgSize.width;
+      const cy = Math.random() * svgSize.height;
       setRipples(prev => [
         ...prev,
         { id: rippleId.current++, cx, cy, start: Date.now() },
@@ -125,7 +126,7 @@ export default function Home() {
 
     spawnRipple();
     return () => clearTimeout(timeoutId);
-  }, []);
+  }, [svgSize.width, svgSize.height]);
 
   // 波紋のアニメーション＋交差判定
   useEffect(() => {
@@ -294,6 +295,18 @@ export default function Home() {
     raf = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(raf);
   }, [ripples, maxRadius]);
+
+  useEffect(() => {
+    const updateSize = () => {
+      setSvgSize({
+        width: Math.min(window.innerWidth, 1920),
+        height: Math.min(window.innerHeight, 1080),
+      });
+    };
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
+  }, []);
 
   return (
     <main
