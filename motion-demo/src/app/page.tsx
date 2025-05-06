@@ -28,13 +28,13 @@ const DOT_SPEED = 4; // ドットの移動速度
 const DOT_LIFETIME = 120; // フレーム数（2秒程度）
 
 export default function Home() {
-  const [windowSize, setWindowSize] = useState({ width: 800, height: 600 });
+  const [windowSize, setWindowSize] = useState<{ width: number; height: number } | null>(null);
   const [ripples, setRipples] = useState<Ripple[]>([]);
   const [dots, setDots] = useState<Dot[]>([]);
   const [isVisible, setIsVisible] = useState(false);
   const [fadeOpacity, setFadeOpacity] = useState(0);
   const rippleId = useRef(0);
-  const maxRadius = Math.min(windowSize.width, windowSize.height) * 0.75;
+  const maxRadius = windowSize ? Math.min(windowSize.width, windowSize.height) * 0.75 : 0;
   const crossedPairs = useRef<Set<string>>(new Set());
   const [lines, setLines] = useState<MovingLine[]>([]);
   const lineId = useRef(0);
@@ -51,6 +51,8 @@ export default function Home() {
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
   }, []);
+
+  if (!windowSize) return null;
 
   // 0〜1のprogressを、easeOutQuadで変換
   const easeOutQuad = (t: number) => 1 - (1 - t) * (1 - t);
