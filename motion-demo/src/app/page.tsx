@@ -28,33 +28,17 @@ const DOT_SPEED = 4; // ドットの移動速度
 const DOT_LIFETIME = 120; // フレーム数（2秒程度）
 
 export default function Home() {
-  // 初期値を仮のサイズに
-  const [windowSize, setWindowSize] = useState<{ width: number; height: number }>({
-    width: 800,
-    height: 600,
-  });
+  // windowSizeをHDサイズで固定
+  const windowSize = { width: 1920, height: 1080 };
   const [ripples, setRipples] = useState<Ripple[]>([]);
   const [dots, setDots] = useState<Dot[]>([]);
   const [isVisible, setIsVisible] = useState(false);
   const [fadeOpacity, setFadeOpacity] = useState(0);
   const rippleId = useRef(0);
-  const maxRadius = windowSize ? Math.min(windowSize.width, windowSize.height) * 0.75 : 0;
+  const maxRadius = Math.min(windowSize.width, windowSize.height) * 0.75;
   const crossedPairs = useRef<Set<string>>(new Set());
   const [lines, setLines] = useState<MovingLine[]>([]);
   const lineId = useRef(0);
-
-  // クライアントマウント時に本当のサイズで上書き
-  useEffect(() => {
-    const updateSize = () => {
-      setWindowSize({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
-    };
-    updateSize();
-    window.addEventListener('resize', updateSize);
-    return () => window.removeEventListener('resize', updateSize);
-  }, []);
 
   // 0〜1のprogressを、easeOutQuadで変換
   const easeOutQuad = (t: number) => 1 - (1 - t) * (1 - t);
@@ -62,7 +46,6 @@ export default function Home() {
 
   // 表示/非表示の切り替え
   useEffect(() => {
-    if (!windowSize) return;
     let timeoutId: NodeJS.Timeout;
     let fadeAnimationFrameId: number;
     let startTime: number;
@@ -123,32 +106,29 @@ export default function Home() {
       clearTimeout(timeoutId);
       cancelAnimationFrame(fadeAnimationFrameId);
     };
-  }, [isVisible, windowSize]);
+  }, [isVisible]);
 
   // 波紋を画面内のランダムな位置に発生（間隔もランダム）
   useEffect(() => {
-    if (!windowSize) return;
     let timeoutId: NodeJS.Timeout;
 
     const spawnRipple = () => {
-      const cx = Math.random() * windowSize.width;
-      const cy = Math.random() * windowSize.height;
+      const cx = Math.random() * 1920;
+      const cy = Math.random() * 1080;
       setRipples(prev => [
         ...prev,
         { id: rippleId.current++, cx, cy, start: Date.now() },
       ]);
-      // 次の出現までの間隔をランダム（例：500ms〜3000ms → 167ms〜1000ms）
       const nextInterval = 167 + Math.random() * 833;
       timeoutId = setTimeout(spawnRipple, nextInterval);
     };
 
     spawnRipple();
     return () => clearTimeout(timeoutId);
-  }, [windowSize]);
+  }, []);
 
   // 波紋のアニメーション＋交差判定
   useEffect(() => {
-    if (!windowSize) return;
     let raf: number;
     crossedPairs.current = new Set();
 
@@ -236,19 +216,16 @@ export default function Home() {
     };
     raf = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(raf);
-  }, [maxRadius, windowSize.width, windowSize.height]);
+  }, [maxRadius]);
 
   // 直線を一定間隔で追加
   useEffect(() => {
-    if (!windowSize) return;
     let timeoutId: NodeJS.Timeout;
     const spawnLine = () => {
-      // x座標は画面内のランダムな位置
-      const x = Math.random() * windowSize.width;
-      // direction: 1なら上から下、-1なら下から上
+      const x = Math.random() * 1920;
       const direction = Math.random() < 0.5 ? 1 : -1;
-      const y = direction === 1 ? -10 : windowSize.height + 10;
-      const speed = 1 + Math.random() * 2; // 1〜3px/frame
+      const y = direction === 1 ? -10 : 1080 + 10;
+      const speed = 1 + Math.random() * 2;
       setLines(prev => [
         ...prev,
         { id: lineId.current++, x, y, direction, speed, hitCircles: new Set() },
@@ -257,11 +234,10 @@ export default function Home() {
     };
     spawnLine();
     return () => clearTimeout(timeoutId);
-  }, [windowSize]);
+  }, []);
 
   // 直線のアニメーション
   useEffect(() => {
-    if (!windowSize) return;
     let raf: number;
     const animate = () => {
       setLines(prev =>
@@ -317,7 +293,7 @@ export default function Home() {
     };
     raf = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(raf);
-  }, [windowSize, ripples, maxRadius]);
+  }, [ripples, maxRadius]);
 
   return (
     <main
@@ -343,10 +319,17 @@ export default function Home() {
         Next.js - Vercel - github test
       </div>
       <svg
-        width="100vw"
-        height="100vh"
-        viewBox={`0 0 ${windowSize.width} ${windowSize.height}`}
-        style={{ display: 'block', width: '100vw', height: '100vh' }}
+        width="1920"
+        height="1080"
+        viewBox="0 0 1920 1080"
+        style={{
+          display: 'block',
+          position: 'absolute',
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
+          background: 'none',
+        }}
         preserveAspectRatio="xMidYMid meet"
       >
         {/* 垂直移動する直線 */}
@@ -369,7 +352,7 @@ export default function Home() {
             (Date.now() - r.start) / RIPPLE_DURATION,
             1
           );
-          const eased = easeOutQuad(progress);
+          const eased = 1 - (1 - progress) * (1 - progress);
           const radius = 10 + eased * maxRadius;
           let opacity = 0.5;
           if (progress > 0.9) {
