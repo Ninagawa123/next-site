@@ -6,6 +6,8 @@ const BG_COLOR = '#1a1a1a';
 const RIPPLE_COLOR = '#666666';
 const RIPPLE_DURATION = 4200; // ms
 
+const svgSize = { width: 1920, height: 1080 };
+
 type Ripple = {
   id: number;
   cx: number;
@@ -28,8 +30,6 @@ const DOT_SPEED = 4; // ドットの移動速度
 const DOT_LIFETIME = 120; // フレーム数（2秒程度）
 
 export default function Home() {
-  // svgSizeの初期値はHDサイズ
-  const [svgSize, setSvgSize] = useState({ width: 1920, height: 1080 });
   const [ripples, setRipples] = useState<Ripple[]>([]);
   const [dots, setDots] = useState<Dot[]>([]);
   const [isVisible, setIsVisible] = useState(false);
@@ -39,19 +39,6 @@ export default function Home() {
   const crossedPairs = useRef<Set<string>>(new Set());
   const [lines, setLines] = useState<MovingLine[]>([]);
   const lineId = useRef(0);
-
-  // クライアントマウント後のみwindow参照
-  useEffect(() => {
-    const updateSize = () => {
-      setSvgSize({
-        width: Math.min(window.innerWidth, 1920),
-        height: Math.min(window.innerHeight, 1080),
-      });
-    };
-    updateSize();
-    window.addEventListener('resize', updateSize);
-    return () => window.removeEventListener('resize', updateSize);
-  }, []);
 
   // 0〜1のprogressを、easeOutQuadで変換
   const easeOutQuad = (t: number) => 1 - (1 - t) * (1 - t);
@@ -138,7 +125,7 @@ export default function Home() {
 
     spawnRipple();
     return () => clearTimeout(timeoutId);
-  }, [svgSize.width, svgSize.height]);
+  }, []);
 
   // 波紋のアニメーション＋交差判定
   useEffect(() => {
@@ -243,11 +230,11 @@ export default function Home() {
         ...prev,
         { id: lineId.current++, x, y, direction, speed, hitCircles: new Set() },
       ]);
-      timeoutId = setTimeout(spawnLine, 1500 + Math.random() * 2000);
+      timeoutId = setTimeout(spawnLine, (1500 + Math.random() * 2000) / 3);
     };
     spawnLine();
     return () => clearTimeout(timeoutId);
-  }, [svgSize.width, svgSize.height]);
+  }, []);
 
   // 直線のアニメーション
   useEffect(() => {
@@ -307,10 +294,6 @@ export default function Home() {
     raf = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(raf);
   }, [ripples, maxRadius]);
-
-  useEffect(() => {
-    setRipples([]);
-  }, [svgSize.width, svgSize.height]);
 
   return (
     <main
