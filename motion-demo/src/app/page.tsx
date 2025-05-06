@@ -4,7 +4,6 @@ import React, { useEffect, useRef, useState } from 'react';
 
 const BG_COLOR = '#1a1a1a';
 const RIPPLE_COLOR = '#666666';
-const RIPPLE_MAX_RADIUS = 100;
 const RIPPLE_DURATION = 4200; // ms
 
 type Ripple = {
@@ -259,7 +258,7 @@ export default function Home() {
       setLines(prev =>
         prev
           .map(line => {
-            let newY = line.y + line.speed * line.direction;
+            const newY = line.y + line.speed * line.direction;
             // 画面を横切ったら消す
             if (line.direction === 1 && newY > windowSize.height + 10) return null;
             if (line.direction === -1 && newY < -10) return null;
