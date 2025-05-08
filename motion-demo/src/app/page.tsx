@@ -9,45 +9,14 @@ const RIPPLE_DURATION = 4200; // ms
 const DOT_SPEED = 4; // ドットの移動速度
 const DOT_LIFETIME = 120; // フレーム数（2秒程度）
 
+// 固定サイズの定義
+const VIEWPORT_WIDTH = 1920;
+const VIEWPORT_HEIGHT = 1080;
+const MAX_RADIUS = Math.min(VIEWPORT_WIDTH, VIEWPORT_HEIGHT) * 0.75;
+
 // イージング関数
 const easeOutQuad = (t: number) => 1 - (1 - t) * (1 - t);
 const easeInOutQuad = (t: number) => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-
-// ウィンドウサイズを取得するカスタムフック
-const useWindowSize = () => {
-  const [size, setSize] = useState<{ width: number; height: number }>({ width: 1920, height: 1080 });
-  const [isClient, setIsClient] = useState(false);
-  const resizeTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
-
-  useEffect(() => {
-    setIsClient(true);
-    
-    const updateSize = () => {
-      if (resizeTimeout.current) {
-        clearTimeout(resizeTimeout.current);
-      }
-      
-      resizeTimeout.current = setTimeout(() => {
-        const width = window.innerWidth;
-        const height = window.innerHeight;
-        setSize({ width, height });
-      }, 100);
-    };
-
-    // 初期サイズの設定
-    updateSize();
-    
-    window.addEventListener('resize', updateSize);
-    return () => {
-      window.removeEventListener('resize', updateSize);
-      if (resizeTimeout.current) {
-        clearTimeout(resizeTimeout.current);
-      }
-    };
-  }, []);
-
-  return { size, isClient };
-};
 
 type Ripple = {
   id: number;
@@ -68,28 +37,23 @@ type MovingLine = {
 };
 
 // アニメーションコンポーネント
-const AnimationComponent = ({ size }: { size: { width: number; height: number } }) => {
+const AnimationComponent = () => {
   const [ripples, setRipples] = useState<Ripple[]>([]);
   const [dots, setDots] = useState<Dot[]>([]);
   const [isVisible, setIsVisible] = useState(false);
   const [fadeOpacity, setFadeOpacity] = useState(0);
   const rippleId = useRef(0);
-  const maxRadius = useRef(0);
   const crossedPairs = useRef<Set<string>>(new Set());
   const [lines, setLines] = useState<MovingLine[]>([]);
   const lineId = useRef(0);
   const animationRef = useRef<number | undefined>(undefined);
   const isInitialized = useRef(false);
-  const lastSize = useRef(size);
 
-  // サイズ変更の検出と初期化
+  // 初期化
   useEffect(() => {
-    if (size.width !== lastSize.current.width || size.height !== lastSize.current.height) {
-      lastSize.current = size;
-      maxRadius.current = Math.min(size.width, size.height) * 0.75;
-      isInitialized.current = true;
-    }
-  }, [size]);
+    if (isInitialized.current) return;
+    isInitialized.current = true;
+  }, []);
 
   // 表示/非表示の切り替え
   useEffect(() => {
@@ -162,8 +126,8 @@ const AnimationComponent = ({ size }: { size: { width: number; height: number } 
     let timeoutId: NodeJS.Timeout;
 
     const spawnRipple = () => {
-      const cx = Math.random() * size.width;
-      const cy = Math.random() * size.height;
+      const cx = Math.random() * VIEWPORT_WIDTH;
+      const cy = Math.random() * VIEWPORT_HEIGHT;
       setRipples(prev => [
         ...prev,
         { id: rippleId.current++, cx, cy, start: Date.now() },
@@ -174,7 +138,7 @@ const AnimationComponent = ({ size }: { size: { width: number; height: number } 
 
     spawnRipple();
     return () => clearTimeout(timeoutId);
-  }, [size]);
+  }, []);
 
   // 波紋のアニメーション＋交差判定
   useEffect(() => {
@@ -195,8 +159,8 @@ const AnimationComponent = ({ size }: { size: { width: number; height: number } 
             const b = aliveRipples[j];
             const progressA = Math.min((now - a.start) / RIPPLE_DURATION, 1);
             const progressB = Math.min((now - b.start) / RIPPLE_DURATION, 1);
-            const rA = 10 + easeOutQuad(progressA) * maxRadius.current;
-            const rB = 10 + easeOutQuad(progressB) * maxRadius.current;
+            const rA = 10 + easeOutQuad(progressA) * MAX_RADIUS;
+            const rB = 10 + easeOutQuad(progressB) * MAX_RADIUS;
             const dx = b.cx - a.cx;
             const dy = b.cy - a.cy;
             const d = Math.hypot(dx, dy);
@@ -215,9 +179,9 @@ const AnimationComponent = ({ size }: { size: { width: number; height: number } 
                 const ry = dx * (h / d);
 
                 // 2つの交点
-                const centerX = size.width / 2;
-                const centerY = size.height / 2;
-                [ { x: xm + rx, y: ym + ry }, { x: xm - rx, y: ym - ry } ].forEach(dot => {
+                const centerX = VIEWPORT_WIDTH / 2;
+                const centerY = VIEWPORT_HEIGHT / 2;
+                [{ x: xm + rx, y: ym + ry }, { x: xm - rx, y: ym - ry }].forEach(dot => {
                   // 方向ベクトルを正規化
                   const dirX = dot.x - centerX;
                   const dirY = dot.y - centerY;
@@ -255,9 +219,9 @@ const AnimationComponent = ({ size }: { size: { width: number; height: number } 
             dot =>
               dot.life > 0 &&
               dot.x >= -10 &&
-              dot.x <= size.width + 10 &&
+              dot.x <= VIEWPORT_WIDTH + 10 &&
               dot.y >= -10 &&
-              dot.y <= size.height + 10
+              dot.y <= VIEWPORT_HEIGHT + 10
           )
       );
 
@@ -270,16 +234,16 @@ const AnimationComponent = ({ size }: { size: { width: number; height: number } 
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [size]);
+  }, []);
 
   // 直線を一定間隔で追加
   useEffect(() => {
     if (!isInitialized.current) return;
     let timeoutId: NodeJS.Timeout;
     const spawnLine = () => {
-      const x = Math.random() * size.width;
+      const x = Math.random() * VIEWPORT_WIDTH;
       const direction = Math.random() < 0.5 ? 1 : -1;
-      const y = direction === 1 ? -10 : size.height + 10;
+      const y = direction === 1 ? -10 : VIEWPORT_HEIGHT + 10;
       const speed = 1 + Math.random() * 2;
       setLines(prev => [
         ...prev,
@@ -289,7 +253,7 @@ const AnimationComponent = ({ size }: { size: { width: number; height: number } 
     };
     spawnLine();
     return () => clearTimeout(timeoutId);
-  }, [size]);
+  }, []);
 
   // 直線のアニメーション
   useEffect(() => {
@@ -301,7 +265,7 @@ const AnimationComponent = ({ size }: { size: { width: number; height: number } 
           .map(line => {
             const newY = line.y + line.speed * line.direction;
             // 画面を横切ったら消す
-            if (line.direction === 1 && newY > size.height + 10) return null;
+            if (line.direction === 1 && newY > VIEWPORT_HEIGHT + 10) return null;
             if (line.direction === -1 && newY < -10) return null;
 
             // 波紋との衝突判定
@@ -309,28 +273,28 @@ const AnimationComponent = ({ size }: { size: { width: number; height: number } 
             ripples.forEach(r => {
               const progress = Math.min((now - r.start) / RIPPLE_DURATION, 1);
               const eased = easeOutQuad(progress);
-              const radius = 10 + eased * maxRadius.current;
-              
+              const radius = 10 + eased * MAX_RADIUS;
+
               // ラインの先頭の座標
               const lineHeadY = line.direction === 1 ? newY + 200 : newY;
-              
+
               // 衝突判定（円と点の距離）
               const dx = line.x - r.cx;
               const dy = lineHeadY - r.cy;
               const distance = Math.sqrt(dx * dx + dy * dy);
-              
+
               if (distance <= radius && !line.hitCircles.has(r.id)) {
                 // 初回衝突時にドットを生成
-                const centerX = size.width / 2;
-                const centerY = size.height / 2;
-                
+                const centerX = VIEWPORT_WIDTH / 2;
+                const centerY = VIEWPORT_HEIGHT / 2;
+
                 // 方向ベクトルを正規化
                 const dirX = line.x - centerX;
                 const dirY = lineHeadY - centerY;
                 const len = Math.hypot(dirX, dirY) || 1;
                 const vx = (dirX / len) * DOT_SPEED;
                 const vy = (dirY / len) * DOT_SPEED;
-                
+
                 setDots(prev => [
                   ...prev,
                   { x: line.x, y: lineHeadY, vx, vy, life: DOT_LIFETIME }
@@ -349,13 +313,13 @@ const AnimationComponent = ({ size }: { size: { width: number; height: number } 
     };
     raf = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(raf);
-  }, [ripples, size]);
+  }, [ripples]);
 
   if (!isInitialized.current) return null;
 
   return (
     <svg
-      viewBox={`0 0 ${size.width} ${size.height}`}
+      viewBox={`0 0 ${VIEWPORT_WIDTH} ${VIEWPORT_HEIGHT}`}
       width="100%"
       height="100%"
       preserveAspectRatio="none"
@@ -389,7 +353,7 @@ const AnimationComponent = ({ size }: { size: { width: number; height: number } 
           1
         );
         const eased = 1 - (1 - progress) * (1 - progress);
-        const radius = 10 + eased * maxRadius.current;
+        const radius = 10 + eased * MAX_RADIUS;
         let opacity = 0.5;
         if (progress > 0.9) {
           opacity = 0.5 * (1 - (progress - 0.9) / 0.1);
@@ -424,22 +388,6 @@ const AnimationComponent = ({ size }: { size: { width: number; height: number } 
 
 // メインコンポーネント
 const Home = () => {
-  const { size, isClient } = useWindowSize();
-
-  if (!isClient) {
-    return (
-      <main
-        style={{
-          width: '100vw',
-          height: '100dvh',
-          background: BG_COLOR,
-          overflow: 'hidden',
-          position: 'relative',
-        }}
-      />
-    );
-  }
-
   return (
     <main
       style={{
@@ -463,23 +411,10 @@ const Home = () => {
       >
         Next.js - Vercel - github test
       </div>
-      <AnimationComponent size={size} />
+      <AnimationComponent />
     </main>
   );
 };
 
 // クライアントサイドのみでレンダリング
-export default dynamic(() => Promise.resolve(Home), { 
-  ssr: false,
-  loading: () => (
-    <main
-      style={{
-        width: '100vw',
-        height: '100dvh',
-        background: BG_COLOR,
-        overflow: 'hidden',
-        position: 'relative',
-      }}
-    />
-  )
-});
+export default dynamic(() => Promise.resolve(Home), { ssr: false });
