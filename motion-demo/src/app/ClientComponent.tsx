@@ -57,7 +57,7 @@ const ClientComponent = () => {
   const crossedPairs = useRef<Set<string>>(new Set());
   const [lines, setLines] = useState<MovingLine[]>([]);
   const lineId = useRef(0);
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number | undefined>(undefined);
 
   // maxRadiusを更新
   useEffect(() => {
