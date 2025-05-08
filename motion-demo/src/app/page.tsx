@@ -16,10 +16,10 @@ const easeInOutQuad = (t: number) => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t +
 // ウィンドウサイズを取得するカスタムフック
 const useWindowSize = () => {
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-
+    setIsClient(true);
     const update = () => setSize({ 
       width: window.innerWidth, 
       height: window.innerHeight 
@@ -29,7 +29,7 @@ const useWindowSize = () => {
     return () => window.removeEventListener('resize', update);
   }, []);
 
-  return size;
+  return { size, isClient };
 };
 
 type Ripple = {
@@ -62,14 +62,18 @@ const AnimationComponent = ({ size }: { size: { width: number; height: number } 
   const [lines, setLines] = useState<MovingLine[]>([]);
   const lineId = useRef(0);
   const animationRef = useRef<number | undefined>(undefined);
+  const isInitialized = useRef(false);
 
-  // maxRadiusを更新
+  // 初期化
   useEffect(() => {
+    if (isInitialized.current) return;
     maxRadius.current = Math.min(size.width, size.height) * 0.75;
+    isInitialized.current = true;
   }, [size]);
 
   // 表示/非表示の切り替え
   useEffect(() => {
+    if (!isInitialized.current) return;
     let timeoutId: NodeJS.Timeout;
     let fadeAnimationFrameId: number;
     let startTime: number;
@@ -134,6 +138,7 @@ const AnimationComponent = ({ size }: { size: { width: number; height: number } 
 
   // 波紋を画面内のランダムな位置に発生（間隔もランダム）
   useEffect(() => {
+    if (!isInitialized.current) return;
     let timeoutId: NodeJS.Timeout;
 
     const spawnRipple = () => {
@@ -153,6 +158,7 @@ const AnimationComponent = ({ size }: { size: { width: number; height: number } 
 
   // 波紋のアニメーション＋交差判定
   useEffect(() => {
+    if (!isInitialized.current) return;
     crossedPairs.current = new Set();
 
     const animate = () => {
@@ -248,6 +254,7 @@ const AnimationComponent = ({ size }: { size: { width: number; height: number } 
 
   // 直線を一定間隔で追加
   useEffect(() => {
+    if (!isInitialized.current) return;
     let timeoutId: NodeJS.Timeout;
     const spawnLine = () => {
       const x = Math.random() * size.width;
@@ -266,6 +273,7 @@ const AnimationComponent = ({ size }: { size: { width: number; height: number } 
 
   // 直線のアニメーション
   useEffect(() => {
+    if (!isInitialized.current) return;
     let raf: number;
     const animate = () => {
       setLines(prev =>
@@ -322,6 +330,8 @@ const AnimationComponent = ({ size }: { size: { width: number; height: number } 
     raf = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(raf);
   }, [ripples, size]);
+
+  if (!isInitialized.current) return null;
 
   return (
     <svg
@@ -394,9 +404,9 @@ const AnimationComponent = ({ size }: { size: { width: number; height: number } 
 
 // メインコンポーネント
 const Home = () => {
-  const size = useWindowSize();
+  const { size, isClient } = useWindowSize();
 
-  if (!size) return null;
+  if (!isClient || !size) return null;
 
   return (
     <main
