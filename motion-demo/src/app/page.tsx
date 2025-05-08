@@ -6,7 +6,30 @@ const BG_COLOR = '#1a1a1a';
 const RIPPLE_COLOR = '#666666';
 const RIPPLE_DURATION = 4200; // ms
 
-const svgSize = { width: 1920, height: 1080 };
+// ウィンドウサイズを取得するカスタムフック
+const useWindowSize = () => {
+  const [windowSize, setWindowSize] = useState({
+    width: 0,
+    height: 0,
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const handleResize = () => {
+        setWindowSize({
+          width: window.innerWidth,
+          height: window.innerHeight,
+        });
+      };
+
+      window.addEventListener("resize", handleResize);
+      handleResize();
+      return () => window.removeEventListener("resize", handleResize);
+    }
+  }, []);
+
+  return windowSize;
+};
 
 type Ripple = {
   id: number;
@@ -30,6 +53,8 @@ const DOT_SPEED = 4; // ドットの移動速度
 const DOT_LIFETIME = 120; // フレーム数（2秒程度）
 
 export default function Home() {
+  const { width, height } = useWindowSize();
+  const svgSize = { width: width || 1920, height: height || 1080 };
   const [ripples, setRipples] = useState<Ripple[]>([]);
   const [dots, setDots] = useState<Dot[]>([]);
   const [isVisible, setIsVisible] = useState(false);
