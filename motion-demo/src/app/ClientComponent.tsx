@@ -13,6 +13,16 @@ const VIEWPORT_WIDTH = 1920;
 const VIEWPORT_HEIGHT = 1080;
 const MAX_RADIUS = Math.min(VIEWPORT_WIDTH, VIEWPORT_HEIGHT) * 0.75;
 
+// 乱数生成のためのユーティリティ関数
+const getRandomPosition = () => {
+  // より均一な分布を得るために、中心からの距離を考慮
+  const angle = Math.random() * Math.PI * 2;
+  const distance = Math.sqrt(Math.random()) * (MAX_RADIUS * 0.8);
+  const x = VIEWPORT_WIDTH / 2 + Math.cos(angle) * distance;
+  const y = VIEWPORT_HEIGHT / 2 + Math.sin(angle) * distance;
+  return { x, y };
+};
+
 type Ripple = {
   id: number;
   cx: number;
@@ -26,9 +36,9 @@ type MovingLine = {
   id: number;
   x: number;
   y: number;
-  direction: 1 | -1; // 1: 下向き, -1: 上向き
+  direction: 1 | -1;
   speed: number;
-  hitCircles: Set<number>; // 衝突済みの波紋IDを記録
+  hitCircles: Set<number>;
 };
 
 const ClientComponent = () => {
@@ -36,6 +46,7 @@ const ClientComponent = () => {
   const [dots, setDots] = useState<Dot[]>([]);
   const [isVisible, setIsVisible] = useState(false);
   const [fadeOpacity, setFadeOpacity] = useState(0);
+  const [isInitialized, setIsInitialized] = useState(false);
   const rippleId = useRef(0);
   const crossedPairs = useRef<Set<string>>(new Set());
   const [lines, setLines] = useState<MovingLine[]>([]);
@@ -46,16 +57,27 @@ const ClientComponent = () => {
   const easeOutQuad = (t: number) => 1 - (1 - t) * (1 - t);
   const easeInOutQuad = (t: number) => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 
+  // コンポーネントの初期化
+  useEffect(() => {
+    setIsInitialized(true);
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, []);
+
   // 表示/非表示の切り替え
   useEffect(() => {
+    if (!isInitialized) return;
+
     let timeoutId: NodeJS.Timeout;
     let fadeAnimationFrameId: number;
     let startTime: number;
 
-    // フェードアウト
     const fadeOut = () => {
       const elapsed = Date.now() - startTime;
-      const progress = Math.min(elapsed / 6000, 1); // 6秒
+      const progress = Math.min(elapsed / 6000, 1);
       const easedProgress = easeInOutQuad(progress);
       const newOpacity = 1 - easedProgress;
 
@@ -68,10 +90,9 @@ const ClientComponent = () => {
       }
     };
 
-    // フェードイン
     const fadeIn = () => {
       const elapsed = Date.now() - startTime;
-      const progress = Math.min(elapsed / 6000, 1); // 6秒
+      const progress = Math.min(elapsed / 6000, 1);
       const easedProgress = easeInOutQuad(progress);
       const newOpacity = easedProgress;
 
@@ -87,16 +108,15 @@ const ClientComponent = () => {
       if (isVisible) {
         startTime = Date.now();
         fadeOut();
-        timeoutId = setTimeout(toggleVisibility, 10000); // 10秒後に表示
+        timeoutId = setTimeout(toggleVisibility, 10000);
       } else {
         setIsVisible(true);
         startTime = Date.now();
         fadeIn();
-        timeoutId = setTimeout(toggleVisibility, 10000); // 10秒後に非表示
+        timeoutId = setTimeout(toggleVisibility, 10000);
       }
     };
 
-    // 3秒後に最初の表示を開始
     timeoutId = setTimeout(() => {
       setIsVisible(true);
       startTime = Date.now();
@@ -108,18 +128,19 @@ const ClientComponent = () => {
       clearTimeout(timeoutId);
       cancelAnimationFrame(fadeAnimationFrameId);
     };
-  }, [isVisible]);
+  }, [isVisible, isInitialized]);
 
-  // 波紋を画面内のランダムな位置に発生（間隔もランダム）
+  // 波紋の生成
   useEffect(() => {
+    if (!isInitialized) return;
+
     let timeoutId: NodeJS.Timeout;
 
     const spawnRipple = () => {
-      const cx = Math.random() * VIEWPORT_WIDTH;
-      const cy = Math.random() * VIEWPORT_HEIGHT;
+      const { x, y } = getRandomPosition();
       setRipples(prev => [
         ...prev,
-        { id: rippleId.current++, cx, cy, start: Date.now() },
+        { id: rippleId.current++, cx: x, cy: y, start: Date.now() },
       ]);
       const nextInterval = 167 + Math.random() * 833;
       timeoutId = setTimeout(spawnRipple, nextInterval);
@@ -127,10 +148,11 @@ const ClientComponent = () => {
 
     spawnRipple();
     return () => clearTimeout(timeoutId);
-  }, []);
+  }, [isInitialized]);
 
   // 波紋のアニメーション＋交差判定
   useEffect(() => {
+    if (!isInitialized) return;
     crossedPairs.current = new Set();
 
     const animate = () => {
@@ -138,7 +160,6 @@ const ClientComponent = () => {
         const now = Date.now();
         const aliveRipples = prevRipples.filter(r => now - r.start < RIPPLE_DURATION);
 
-        // 交差判定とドット・波紋生成
         const newDots: Dot[] = [];
         const newRipples: Ripple[] = [];
         for (let i = 0; i < aliveRipples.length; i++) {
@@ -158,7 +179,6 @@ const ClientComponent = () => {
               if (!crossedPairs.current.has(pairId)) {
                 crossedPairs.current.add(pairId);
 
-                // 交点計算
                 const a_ = (rA * rA - rB * rB + d * d) / (2 * d);
                 const h = Math.sqrt(Math.max(0, rA * rA - a_ * a_));
                 const xm = a.cx + (a_ * dx) / d;
@@ -166,11 +186,9 @@ const ClientComponent = () => {
                 const rx = -(dy * (h / d));
                 const ry = dx * (h / d);
 
-                // 2つの交点
                 const centerX = VIEWPORT_WIDTH / 2;
                 const centerY = VIEWPORT_HEIGHT / 2;
                 [ { x: xm + rx, y: ym + ry }, { x: xm - rx, y: ym - ry } ].forEach(dot => {
-                  // 方向ベクトルを正規化
                   const dirX = dot.x - centerX;
                   const dirY = dot.y - centerY;
                   const len = Math.hypot(dirX, dirY) || 1;
@@ -179,7 +197,6 @@ const ClientComponent = () => {
                   newDots.push({ x: dot.x, y: dot.y, vx, vy, life: DOT_LIFETIME });
                 });
 
-                // 交点から新しい波紋を発生
                 newRipples.push(
                   { id: rippleId.current++, cx: xm + rx, cy: ym + ry, start: now },
                   { id: rippleId.current++, cx: xm - rx, cy: ym - ry, start: now }
@@ -188,13 +205,10 @@ const ClientComponent = () => {
             }
           }
         }
-        // ドットを追加
         setDots(prev => [...prev, ...newDots].slice(-300));
-        // 新しい波紋も追加（最大50個まで）
         return [...aliveRipples, ...newRipples].slice(-50);
       });
 
-      // ドットの移動・寿命管理
       setDots(prev =>
         prev
           .map(dot => ({
@@ -222,10 +236,12 @@ const ClientComponent = () => {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, []);
+  }, [isInitialized]);
 
-  // 直線を一定間隔で追加
+  // 直線の生成
   useEffect(() => {
+    if (!isInitialized) return;
+
     let timeoutId: NodeJS.Timeout;
     const spawnLine = () => {
       const x = Math.random() * VIEWPORT_WIDTH;
@@ -240,41 +256,35 @@ const ClientComponent = () => {
     };
     spawnLine();
     return () => clearTimeout(timeoutId);
-  }, []);
+  }, [isInitialized]);
 
   // 直線のアニメーション
   useEffect(() => {
+    if (!isInitialized) return;
+
     let raf: number;
     const animate = () => {
       setLines(prev =>
         prev
           .map(line => {
             const newY = line.y + line.speed * line.direction;
-            // 画面を横切ったら消す
             if (line.direction === 1 && newY > VIEWPORT_HEIGHT + 10) return null;
             if (line.direction === -1 && newY < -10) return null;
 
-            // 波紋との衝突判定
             const now = Date.now();
             ripples.forEach(r => {
               const progress = Math.min((now - r.start) / RIPPLE_DURATION, 1);
               const eased = easeOutQuad(progress);
               const radius = 10 + eased * MAX_RADIUS;
               
-              // ラインの先頭の座標
               const lineHeadY = line.direction === 1 ? newY + 200 : newY;
-              
-              // 衝突判定（円と点の距離）
               const dx = line.x - r.cx;
               const dy = lineHeadY - r.cy;
               const distance = Math.sqrt(dx * dx + dy * dy);
               
               if (distance <= radius && !line.hitCircles.has(r.id)) {
-                // 初回衝突時にドットを生成
                 const centerX = VIEWPORT_WIDTH / 2;
                 const centerY = VIEWPORT_HEIGHT / 2;
-                
-                // 方向ベクトルを正規化
                 const dirX = line.x - centerX;
                 const dirY = lineHeadY - centerY;
                 const len = Math.hypot(dirX, dirY) || 1;
@@ -286,7 +296,6 @@ const ClientComponent = () => {
                   { x: line.x, y: lineHeadY, vx, vy, life: DOT_LIFETIME }
                 ].slice(-300));
 
-                // 衝突済みとして記録
                 line.hitCircles.add(r.id);
               }
             });
@@ -299,7 +308,11 @@ const ClientComponent = () => {
     };
     raf = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(raf);
-  }, [ripples]);
+  }, [ripples, isInitialized]);
+
+  if (!isInitialized) {
+    return null;
+  }
 
   return (
     <main
@@ -338,7 +351,6 @@ const ClientComponent = () => {
           zIndex: 0,
         }}
       >
-        {/* 垂直移動する直線 */}
         {isVisible && lines.map(line => (
           <g key={line.id}>
             <line
@@ -352,7 +364,6 @@ const ClientComponent = () => {
             />
           </g>
         ))}
-        {/* 波紋のみ */}
         {isVisible && ripples.map(r => {
           const progress = Math.min(
             (Date.now() - r.start) / RIPPLE_DURATION,
@@ -377,7 +388,6 @@ const ClientComponent = () => {
             />
           );
         })}
-        {/* 交点ドット */}
         {dots.map((dot, i) => (
           <circle
             key={i}
